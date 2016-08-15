@@ -1,42 +1,143 @@
 import time
-import poloniex
-from subprocess import Popen, PIPE
+import json
+import heapq
+from poloniex import PoloniexClient 
 from multiprocessing.dummy import Process as Thread
 
-class OrderBook(object):
+class OrderBook2(object):
+
 	def __init__(self):
-		self._receiverT = None
-		self._catchersP = {}
+		self._poloniex = PoloniexClient("","")
+		self._consumerThread = None
+		self._symbols = []
 
-	def startBook(self, symbol):
-		if not self._catchersP:
-			self._receiverT = Thread(target=self.orderReceiver); 
-			self._receiverT.daemon = True
-			self._receiverT.start()
-                	print('BOOK: receiver thread started')
+		self._bids = {}
+		self._asks = {}
 
-		self._catchersP[ symbol ] = Popen(["python", "ordercatcher.py", str(symbol) ], stdin=PIPE, stdout=PIPE, bufsize=1)
-                print('BOOK: {} process started'.format(symbol))
+	def peekBids(self, symbol):
+		bids = self._bids[ symbol ][:]
+		if bids:
+			ret = bids[0]
+			ret[0] = ret[0] * -1
+			return ret
+		else:
+			return [None, None]
 
-	def stopBook(self, symbol):
-	
-		self._catchersP[ symbol ].terminate()	
-		self._catchersP[ symbol ].kill()
-		del self._catchersP[ symbol ]
-		print ('BOOK: {} process stopped'.format(symbol))
-		if not self._catchersP:
-			self._receiverT.join()
-			print('BOOK: reciever thread stopped')
-			
-	def orderReceiver(self): 
-		# catches orders from ordercatcher
-		pass
+	def peekAsks(self, symbol):
+		asks = self._asks[ symbol ][:]
+		if asks:
+			return asks[0]
+		else:
+			return [None, None]
+
+	def getBids(self, symbol):
+		ret = self._bids[ symbol ][:]
+		for bid in ret:
+			bid[0] = bid[0] * -1
+		return ret
+
+	def getAsks(self, symbol):
+		return self._asks[ symbol ][:]
+
+	def addAll(self):
+		ticker = self._poloniex.returnTicker()
+		for sym in ticker.keys():
+			self.add(sym)
+
+	def removeAll(self):
+		self._symbols = []
+
+		self._bids = {}
+		self._asks = {}
+
+		self._consumerT.join()
+		print('BOOK: consumer thread stopped')
+
+
+	def add(self, symbol):
+		self._symbols.append(symbol)
+
+		self._asks[symbol] = []
+		self._bids[symbol] = []
+
+		if len(self._symbols) == 1:
+			self._consumerThread = Thread(target=self.orderConsumer); 
+			self._consumerThread.daemon = True
+			self._consumerThread.start()
+			print('BOOK: consumer thread started')
+
+	def remove(self, symbol):
+
+		self._symboles.remove(symbol)
+
+		if len(self._symbols) == 0:
+			self._consumerT.join()
+			print('BOOK: consumer thread stopped')
+
+	def orderConsumer(self):
+
+		while len( self._symbols ) > 0:
+
+			for sym in self._symbols:
+				# print sym
+				book = self._poloniex.returnOrderBook(sym)
+
+				if "bids" in book :
+					bids = []
+					for bid in book["bids"]:
+
+						bid[0] = -1*float(bid[0])
+						bid[1] = float(bid[1])
+						heapq.heappush( bids, bid )
+
+					self._bids[sym] = bids
+
+				if "asks" in book :
+					asks = []
+					for ask in book["asks"]:
+						ask[0] = float(ask[0])
+						ask[1] = float(ask[1])
+						heapq.heappush( asks, ask )
+					self._asks[sym] = asks
+
 
 
 
 if __name__ == "__main__":
-	book = OrderBook()
-	book.startBook("BTC_ETH")
+	book = OrderBook2()
+	# book.startBook("BTC_ETH")
+	book.add("BTC_ETH")
+	book.add("ETH_ETC")
+	book.add("BTC_ETC")
 	time.sleep(2)
-	book.stopBook("BTC_ETH")
-	
+
+	while True:
+		time.sleep(1)
+		btc_eth = book.peekBids("BTC_ETH")[0]
+		eth_etc = book.peekBids("ETH_ETC")[0]
+		btc_etc = book.peekAsks("BTC_ETC")[0]
+		print "BTC_ETH:", btc_eth
+		print "ETH_ETC:", eth_etc
+		print "BTC_ETC:", btc_etc
+		btc1 = 1
+		eth = btc1 * ( 1 / (btc_eth) ) * 0.9975
+		etc = eth * ( 1 / (eth_etc) ) * 0.9975
+		btc2 = etc * btc_etc * 0.9975
+		r = btc2/btc1
+		print "1 BTC -> {} ETH -> {} ETC -> {} BTC:  {}/{} = {}".format(eth,etc,btc2,btc1,btc2,r)	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
