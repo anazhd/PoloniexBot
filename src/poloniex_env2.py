@@ -62,7 +62,7 @@ class PoloniexEnv2(Game):
 
 			# Hold BTC
 			else:  
-				print "hold {} BTC with position {}".format(self._btc, self._bid_last - bid_now)
+				print "hold at {} with {} BTC and position {}".format(bid_now, self._btc, self._bid_last - bid_now)
 
 			# ( + for decrease, - for increase )
 			self._position = self._bid_last - bid_now
@@ -81,7 +81,7 @@ class PoloniexEnv2(Game):
 
 			#Hold ETH
 			else:
-				print "hold {} ETH with position {}".format(self._eth, ask_now - self._ask_last)
+				print "hold at {} with {} ETH and position {}".format(ask_now, self._eth, ask_now - self._ask_last)
 
 			# ( - for decrease, + for increase )
 			self._position = ask_now - self._ask_last
@@ -90,7 +90,7 @@ class PoloniexEnv2(Game):
 		self._bid_last = bid_now
 		self._ask_last = ask_now
 
-		self.waitUntilNextTick()
+		self.waitUntilNextTrade()
 		return reward
 
 
@@ -100,21 +100,20 @@ class PoloniexEnv2(Game):
 		b = np.array(b)
 		a = np.array(a)
 		
-		state = np.asarray([[ self._position, self.getTick(), b[:,1].mean(), b[:,0].mean(), b[:,1].sum(), a[:,0].mean(), a[:,1].mean(), a[:,1].sum() ]])
+		state = np.asarray([[ self._position, self.getLastTrade(), b[:,1].mean(), b[:,0].mean(), b[:,1].sum(), a[:,0].mean(), a[:,1].mean(), a[:,1].sum() ]])
 		# print "S:", state[0].tolist()
 		return state
 
-	def getTick(self):
-		return float(self._poloniex.returnTicker()[self._symbol]["last"])
+	def getLastTrade(self):
+		return float(self._poloniex.returnMarketTradeHistory("BTC_ETH")[0]["rate"])
 
-	def waitUntilNextTick(self):
-		current = self.getTick()
-		while( current == self.getTick() ):
+	def waitUntilNextTrade(self):
+		current = self.getLastTrade()
+		while( current == self.getLastTrade() ):
 			time.sleep(0.25)
 			sys.stdout.write('.')
 			sys.stdout.flush()
 		print ""
-
 
 	def getOrderBook(self):
 		book = self._poloniex.returnOrderBook(self._symbol)
