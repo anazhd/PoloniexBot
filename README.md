@@ -2,6 +2,4 @@
 
 pip install -r requirements.txt
 
-python poloniex_run2.py
-
-
+python run_poloniex2.py
